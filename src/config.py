@@ -11,7 +11,7 @@ DEFAULT_FRAME_HEIGHT = 480
 HAAR_SCALE_FACTOR = 1.1
 HAAR_MIN_NEIGHBORS = 5
 HAAR_MIN_SIZE = (30, 30)
-HAAR_MAX_SIZE = None  # No upper limit
+HAAR_MAX_SIZE = None
 
 # DNN Settings
 DNN_CONFIDENCE_THRESHOLD = 0.5
@@ -25,10 +25,10 @@ INFO_OVERLAY_OPACITY = 0.6
 # Performance Settings
 USE_THREADED_CAPTURE = True
 CAPTURE_QUEUE_SIZE = 2
-SKIP_FRAMES = 0  # 0 = no skip, 1 = every other frame, 2 = every 3rd frame
+SKIP_FRAMES = 0
 
 # Logging
-LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR
+LOG_LEVEL = "INFO"
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 # Model Paths
