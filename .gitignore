@@ -30,6 +30,8 @@ Desktop.ini
 
 # Project specific
 models/*.caffemodel
-models/*.prototxt
 *.log
 test_webcam.py
+
+# Ruff cache
+.ruff_cache/
