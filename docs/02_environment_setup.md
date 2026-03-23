@@ -194,14 +194,16 @@ Place both files in the `models/` folder.
 
 | #  | Step                                | Status |
 |----|-------------------------------------|--------|
-| 1  | Python 3.8+ installed               | ☐      |
-| 2  | pip available                       | ☐      |
-| 3  | Repository cloned                   | ☐      |
-| 4  | Virtual environment created         | ☐      |
-| 5  | Dependencies installed              | ☐      |
-| 6  | OpenCV verified                     | ☐      |
-| 7  | Webcam tested                       | ☐      |
-| 8  | Model files downloaded              | ☐      |
+| 1  | Python 3.8+ installed               | ✅ Done |
+| 2  | pip available                       | ✅ Done |
+| 3  | Repository cloned                   | ✅ Done |
+| 4  | Virtual environment created         | ✅ Done |
+| 5  | Dependencies installed              | ✅ Done |
+| 6  | OpenCV verified (4.13.0)            | ✅ Done |
+| 7  | Webcam tested                       | ✅ Done |
+| 8  | Model files downloaded              | ✅ Done |
+
+> ✅ **Environment setup complete!** All 8 steps finished on March 23, 2026.
 
 ---
 
