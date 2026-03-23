@@ -205,3 +205,85 @@ class FPSCounter:
             elapsed = self.timestamps[-1] - self.timestamps[0]
             self.fps = (len(self.timestamps) - 1) / elapsed
         return self.fps
+
+
+class ROISelector:
+    """Region of Interest selector for focusing detection area."""
+
+    def __init__(self, window_name="Select ROI"):
+        self.window_name = window_name
+        self.roi = None
+        self.selecting = False
+        self.start_point = None
+        self.end_point = None
+
+    def select(self, frame):
+        """Let user draw ROI on the frame. Returns (x, y, w, h) or None."""
+        clone = frame.copy()
+        cv2.namedWindow(self.window_name)
+        cv2.setMouseCallback(self.window_name, self._mouse_callback)
+
+        instructions = (
+            "Draw ROI with mouse. Press 'Enter' to confirm, 'r' to reset, 'q' to skip"
+        )
+
+        while True:
+            display = clone.copy()
+
+            # Draw ROI rectangle if selecting
+            if self.start_point and self.end_point:
+                cv2.rectangle(display, self.start_point, self.end_point, (0, 255, 0), 2)
+
+            # Draw instructions
+            cv2.putText(
+                display,
+                instructions,
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (255, 255, 255),
+                2,
+            )
+
+            cv2.imshow(self.window_name, display)
+            key = cv2.waitKey(1) & 0xFF
+
+            if key == 13:  # Enter
+                if self.start_point and self.end_point:
+                    x1 = min(self.start_point[0], self.end_point[0])
+                    y1 = min(self.start_point[1], self.end_point[1])
+                    x2 = max(self.start_point[0], self.end_point[0])
+                    y2 = max(self.start_point[1], self.end_point[1])
+                    self.roi = (x1, y1, x2 - x1, y2 - y1)
+                    logger.info(f"ROI selected: {self.roi}")
+                    break
+            elif key == ord("r"):  # Reset
+                self.start_point = None
+                self.end_point = None
+                self.roi = None
+                clone = frame.copy()
+            elif key == ord("q"):  # Skip
+                self.roi = None
+                logger.info("ROI selection skipped")
+                break
+
+        cv2.destroyWindow(self.window_name)
+        return self.roi
+
+    def _mouse_callback(self, event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.selecting = True
+            self.start_point = (x, y)
+        elif event == cv2.EVENT_MOUSEMOVE and self.selecting:
+            self.end_point = (x, y)
+        elif event == cv2.EVENT_LBUTTONUP:
+            self.selecting = False
+            self.end_point = (x, y)
+
+    @staticmethod
+    def apply_roi(frame, roi):
+        """Crop frame to ROI area."""
+        if roi is None:
+            return frame, (0, 0)
+        x, y, w, h = roi
+        return frame[y : y + h, x : x + w], (x, y)

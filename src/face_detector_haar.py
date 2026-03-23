@@ -28,6 +28,7 @@ from src.utils import (
     draw_face_box,
     draw_info_overlay,
     FPSCounter,
+    ROISelector,
 )
 
 logging.basicConfig(level=getattr(logging, LOG_LEVEL), format=LOG_FORMAT)
@@ -76,6 +77,7 @@ def parse_args():
     parser.add_argument(
         "--no-threaded", action="store_true", help="Disable threaded capture"
     )
+    parser.add_argument("--roi", action="store_true", help="Select region of interest")
     return parser.parse_args()
 
 
@@ -107,6 +109,14 @@ def main():
     fps_counter = FPSCounter()
     frame_count = 0
     skip_frames = 0  # Set to > 0 to skip frames
+    roi = None
+
+    # ROI selection
+    if args.roi:
+        ret, sample_frame = read_frame(cap)
+        if ret and sample_frame is not None:
+            selector = ROISelector("Select Detection Area")
+            roi = selector.select(sample_frame)
 
     logger.info("Starting face detection... Press 'q' to quit.")
 
@@ -122,7 +132,9 @@ def main():
                 break
             continue
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Apply ROI if selected
+        detect_frame, offset = ROISelector.apply_roi(frame, roi)
+        gray = cv2.cvtColor(detect_frame, cv2.COLOR_BGR2GRAY)
         gray = cv2.equalizeHist(gray)
 
         faces = face_cascade.detectMultiScale(
@@ -133,8 +145,14 @@ def main():
             flags=cv2.CASCADE_SCALE_IMAGE,
         )
 
+        # Draw ROI rectangle
+        if roi:
+            x, y, w, h = roi
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 255, 0), 2)
+
         for x, y, w, h in faces:
-            draw_face_box(frame, x, y, w, h, label="Face")
+            # Offset coordinates back to full frame
+            draw_face_box(frame, x + offset[0], y + offset[1], w, h, label="Face")
 
         fps = fps_counter.update()
         draw_info_overlay(frame, len(faces), fps)
