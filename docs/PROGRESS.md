@@ -52,6 +52,30 @@
 
 ---
 
+## 🚀 Planned Improvements
+
+### Current Limitations
+- No command-line arguments (camera index, detection method selection)
+- No threaded video capture (causes frame drops)
+- No face tracking across frames
+- No skip-frame detection for performance
+- No unit tests
+- No logging system
+- No configuration file for parameters
+
+### Potential Features
+- [ ] Add `argparse` for CLI options
+- [ ] Implement multi-threaded capture using `threading.Queue`
+- [ ] Add YOLO/SSD face detector as alternative
+- [ ] Add face recognition (not just detection)
+- [ ] Add recording/screenshot feature
+- [ ] Add ROI (Region of Interest) selection
+- [ ] Package with PyInstaller for standalone executable
+- [ ] Add Docker support
+- [ ] Add GitHub Actions CI/CD pipeline
+
+---
+
 ## Commands to Run
 
 ```bash
