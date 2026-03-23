@@ -4,9 +4,76 @@ utils.py - Shared utilities for the Face Detection System
 
 import cv2
 import time
+import logging
+import threading
+from collections import deque
+
+from src.config import (
+    LOG_LEVEL,
+    LOG_FORMAT,
+    DEFAULT_CAMERA_INDEX,
+    DEFAULT_FRAME_WIDTH,
+    DEFAULT_FRAME_HEIGHT,
+    INFO_OVERLAY_HEIGHT,
+    INFO_OVERLAY_OPACITY,
+    USE_THREADED_CAPTURE,
+    CAPTURE_QUEUE_SIZE,
+)
+
+# Setup logging
+logging.basicConfig(level=getattr(logging, LOG_LEVEL), format=LOG_FORMAT)
+logger = logging.getLogger(__name__)
 
 
-def initialize_camera(camera_index=0, width=640, height=480):
+class ThreadedCamera:
+    """Threaded video capture for non-blocking frame reading."""
+
+    def __init__(self, camera_index=0, width=640, height=480, queue_size=2):
+        self.cap = cv2.VideoCapture(camera_index)
+        self.stopped = False
+        self.queue = deque(maxlen=queue_size)
+
+        if not self.cap.isOpened():
+            raise IOError(f"Cannot open camera at index {camera_index}")
+
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+
+        logger.info(f"Threaded camera initialized ({width}x{height})")
+
+    def start(self):
+        """Start the background thread."""
+        thread = threading.Thread(target=self._update, daemon=True)
+        thread.start()
+        return self
+
+    def _update(self):
+        """Continuously read frames in background."""
+        while not self.stopped:
+            if self.cap.isOpened():
+                ret, frame = self.cap.read()
+                if ret:
+                    self.queue.append(frame)
+
+    def read(self):
+        """Get the latest frame."""
+        if len(self.queue) > 0:
+            return self.queue[-1]
+        return None
+
+    def stop(self):
+        """Stop the thread and release camera."""
+        self.stopped = True
+        self.cap.release()
+        logger.info("Threaded camera stopped")
+
+
+def initialize_camera(
+    camera_index=DEFAULT_CAMERA_INDEX,
+    width=DEFAULT_FRAME_WIDTH,
+    height=DEFAULT_FRAME_HEIGHT,
+    threaded=USE_THREADED_CAPTURE,
+):
     """
     Initialize and configure the webcam.
 
@@ -14,26 +81,46 @@ def initialize_camera(camera_index=0, width=640, height=480):
         camera_index (int): Camera device index (0 = default)
         width (int): Desired frame width
         height (int): Desired frame height
+        threaded (bool): Use threaded capture for better performance
 
     Returns:
-        cv2.VideoCapture: Configured camera object
+        VideoCapture or ThreadedCamera object
 
     Raises:
         IOError: If camera cannot be opened
     """
-    cap = cv2.VideoCapture(camera_index)
+    if threaded:
+        camera = ThreadedCamera(camera_index, width, height)
+        camera.start()
+        return camera
+    else:
+        cap = cv2.VideoCapture(camera_index)
+        if not cap.isOpened():
+            raise IOError(
+                f"Cannot open camera at index {camera_index}. "
+                "Check if webcam is connected and not used by another app."
+            )
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        logger.info(f"Camera initialized ({width}x{height})")
+        return cap
 
-    if not cap.isOpened():
-        raise IOError(
-            f"Cannot open camera at index {camera_index}. "
-            "Check if webcam is connected and not used by another app."
-        )
 
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+def read_frame(cap):
+    """Read a frame from camera (standard or threaded)."""
+    if isinstance(cap, ThreadedCamera):
+        frame = cap.read()
+        return (frame is not None, frame)
+    return cap.read()
 
-    print(f"Camera initialized ({width}x{height})")
-    return cap
+
+def release_camera(cap):
+    """Release camera resources."""
+    if isinstance(cap, ThreadedCamera):
+        cap.stop()
+    else:
+        cap.release()
+    logger.info("Camera released")
 
 
 def draw_face_box(frame, x, y, w, h, label=None, color=(0, 255, 0), thickness=2):
@@ -59,19 +146,25 @@ def draw_face_box(frame, x, y, w, h, label=None, color=(0, 255, 0), thickness=2)
         )
 
 
-def draw_info_overlay(frame, face_count, fps=None):
+def draw_info_overlay(
+    frame,
+    face_count,
+    fps=None,
+    overlay_height=INFO_OVERLAY_HEIGHT,
+    opacity=INFO_OVERLAY_OPACITY,
+):
     """
     Draw an information overlay on the frame showing face count and FPS.
     """
     h, w = frame.shape[:2]
 
     overlay = frame.copy()
-    cv2.rectangle(overlay, (0, 0), (w, 50), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+    cv2.rectangle(overlay, (0, 0), (w, overlay_height), (0, 0, 0), -1)
+    cv2.addWeighted(overlay, opacity, frame, 1 - opacity, 0, frame)
 
     cv2.putText(
         frame,
-        f"Faces Detected: {face_count}",
+        f"Faces: {face_count}",
         (10, 35),
         cv2.FONT_HERSHEY_SIMPLEX,
         1.0,

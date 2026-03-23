@@ -6,43 +6,107 @@ import cv2
 import numpy as np
 import sys
 import os
+import argparse
+import logging
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.utils import initialize_camera, draw_face_box, draw_info_overlay, FPSCounter
+
+from src.config import (
+    DEFAULT_CAMERA_INDEX,
+    DEFAULT_FRAME_WIDTH,
+    DEFAULT_FRAME_HEIGHT,
+    DNN_CONFIDENCE_THRESHOLD,
+    DNN_INPUT_SIZE,
+    DNN_MEAN_SUBTRACTION,
+    MODELS_DIR,
+    DNN_PROTOTXT,
+    DNN_CAFFEMODEL,
+    LOG_LEVEL,
+    LOG_FORMAT,
+)
+from src.utils import (
+    initialize_camera,
+    read_frame,
+    release_camera,
+    draw_face_box,
+    draw_info_overlay,
+    FPSCounter,
+)
+
+logging.basicConfig(level=getattr(logging, LOG_LEVEL), format=LOG_FORMAT)
+logger = logging.getLogger(__name__)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="DNN Face Detection (SSD + ResNet)")
+    parser.add_argument(
+        "--camera",
+        type=int,
+        default=DEFAULT_CAMERA_INDEX,
+        help=f"Camera index (default: {DEFAULT_CAMERA_INDEX})",
+    )
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=DEFAULT_FRAME_WIDTH,
+        help=f"Frame width (default: {DEFAULT_FRAME_WIDTH})",
+    )
+    parser.add_argument(
+        "--height",
+        type=int,
+        default=DEFAULT_FRAME_HEIGHT,
+        help=f"Frame height (default: {DEFAULT_FRAME_HEIGHT})",
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=DNN_CONFIDENCE_THRESHOLD,
+        help=f"Confidence threshold 0.0-1.0 (default: {DNN_CONFIDENCE_THRESHOLD})",
+    )
+    parser.add_argument(
+        "--no-threaded", action="store_true", help="Disable threaded capture"
+    )
+    return parser.parse_args()
 
 
 def main():
-    prototxt = os.path.join("models", "deploy.prototxt")
-    caffemodel = os.path.join("models", "res10_300x300_ssd_iter_140000.caffemodel")
+    args = parse_args()
+
+    # Load DNN Model
+    prototxt = os.path.join(MODELS_DIR, DNN_PROTOTXT)
+    caffemodel = os.path.join(MODELS_DIR, DNN_CAFFEMODEL)
 
     if not os.path.exists(prototxt) or not os.path.exists(caffemodel):
-        print("Model files not found in 'models/' directory!")
-        print("Download them first. See docs/05_dnn_detection_guide.md")
+        logger.error(f"Model files not found in '{MODELS_DIR}/' directory!")
         return
 
     net = cv2.dnn.readNetFromCaffe(prototxt, caffemodel)
-    print("DNN model loaded successfully")
+    logger.info("DNN model loaded successfully")
 
+    # Initialize camera
     try:
-        cap = initialize_camera(camera_index=0, width=640, height=480)
+        cap = initialize_camera(
+            camera_index=args.camera,
+            width=args.width,
+            height=args.height,
+            threaded=not args.no_threaded,
+        )
     except IOError as e:
-        print(f"ERROR: {e}")
+        logger.error(f"Camera error: {e}")
         return
 
-    CONFIDENCE_THRESHOLD = 0.5
     fps_counter = FPSCounter()
-
-    print("Starting DNN face detection... Press 'q' to quit.")
+    logger.info("Starting DNN face detection... Press 'q' to quit.")
 
     while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+        ret, frame = read_frame(cap)
+        if not ret or frame is None:
+            continue
 
         (h, w) = frame.shape[:2]
 
         blob = cv2.dnn.blobFromImage(
-            frame, 1.0, (300, 300), (104.0, 177.0, 123.0), swapRB=False, crop=False
+            frame, 1.0, DNN_INPUT_SIZE, DNN_MEAN_SUBTRACTION, swapRB=False, crop=False
         )
 
         net.setInput(blob)
@@ -52,7 +116,7 @@ def main():
         for i in range(detections.shape[2]):
             confidence = detections[0, 0, i, 2]
 
-            if confidence > CONFIDENCE_THRESHOLD:
+            if confidence > args.threshold:
                 face_count += 1
                 box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
                 (x1, y1, x2, y2) = box.astype("int")
@@ -71,9 +135,9 @@ def main():
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
-    cap.release()
+    release_camera(cap)
     cv2.destroyAllWindows()
-    print("Application closed gracefully.")
+    logger.info("Application closed.")
 
 
 if __name__ == "__main__":

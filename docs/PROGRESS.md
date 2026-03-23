@@ -64,8 +64,10 @@
 - No configuration file for parameters
 
 ### Potential Features
-- [ ] Add `argparse` for CLI options
-- [ ] Implement multi-threaded capture using `threading.Queue`
+- [x] Add `argparse` for CLI options
+- [x] Implement multi-threaded capture using `threading.Queue`
+- [x] Add `config.py` for centralized configuration
+- [x] Add logging system
 - [ ] Add YOLO/SSD face detector as alternative
 - [ ] Add face recognition (not just detection)
 - [ ] Add recording/screenshot feature
@@ -73,6 +75,29 @@
 - [ ] Package with PyInstaller for standalone executable
 - [ ] Add Docker support
 - [ ] Add GitHub Actions CI/CD pipeline
+
+---
+
+## ✅ Improvements Completed (March 23, 2026)
+
+| #  | Improvement                       | Files Changed          |
+|----|-----------------------------------|------------------------|
+| 1  | CLI arguments with argparse       | `face_detector_haar.py`, `face_detector_dnn.py` |
+| 2  | Centralized config                | `src/config.py` (new)  |
+| 3  | Logging system                    | `src/utils.py`, detectors |
+| 4  | Threaded video capture            | `src/utils.py`         |
+
+### CLI Usage Examples
+```bash
+# Haar with custom settings
+python src/face_detector_haar.py --camera 0 --width 1280 --height 720 --scale-factor 1.2
+
+# DNN with custom threshold
+python src/face_detector_dnn.py --threshold 0.7
+
+# Disable threaded capture
+python src/face_detector_haar.py --no-threaded
+```
 
 ---
 
