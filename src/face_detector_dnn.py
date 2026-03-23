@@ -31,6 +31,7 @@ from src.utils import (
     draw_face_box,
     draw_info_overlay,
     FPSCounter,
+    ROISelector,
 )
 
 logging.basicConfig(level=getattr(logging, LOG_LEVEL), format=LOG_FORMAT)
@@ -66,6 +67,7 @@ def parse_args():
     parser.add_argument(
         "--no-threaded", action="store_true", help="Disable threaded capture"
     )
+    parser.add_argument("--roi", action="store_true", help="Select region of interest")
     return parser.parse_args()
 
 
@@ -96,6 +98,15 @@ def main():
         return
 
     fps_counter = FPSCounter()
+    roi = None
+
+    # ROI selection
+    if args.roi:
+        ret, sample_frame = read_frame(cap)
+        if ret and sample_frame is not None:
+            selector = ROISelector("Select Detection Area")
+            roi = selector.select(sample_frame)
+
     logger.info("Starting DNN face detection... Press 'q' to quit.")
 
     while True:
@@ -103,10 +114,22 @@ def main():
         if not ret or frame is None:
             continue
 
-        (h, w) = frame.shape[:2]
+        # Apply ROI if selected
+        detect_frame, offset = ROISelector.apply_roi(frame, roi)
+        (h, w) = detect_frame.shape[:2]
+
+        # Draw ROI rectangle
+        if roi:
+            x, y, rw, rh = roi
+            cv2.rectangle(frame, (x, y), (x + rw, y + rh), (255, 255, 0), 2)
 
         blob = cv2.dnn.blobFromImage(
-            frame, 1.0, DNN_INPUT_SIZE, DNN_MEAN_SUBTRACTION, swapRB=False, crop=False
+            detect_frame,
+            1.0,
+            DNN_INPUT_SIZE,
+            DNN_MEAN_SUBTRACTION,
+            swapRB=False,
+            crop=False,
         )
 
         net.setInput(blob)
@@ -126,7 +149,9 @@ def main():
 
                 bw, bh = x2 - x1, y2 - y1
                 label = f"{confidence * 100:.1f}%"
-                draw_face_box(frame, x1, y1, bw, bh, label=label)
+                draw_face_box(
+                    frame, x1 + offset[0], y1 + offset[1], bw, bh, label=label
+                )
 
         fps = fps_counter.update()
         draw_info_overlay(frame, face_count, fps)
